@@ -303,15 +303,15 @@ EspSoftwareSerial::UART SerialRF;
 bool firstGpsTime = true;
 time_t startTime = 0;
 
-#ifdef BLUETOOTH
-#if !defined(CONFIG_IDF_TARGET_ESP32)
-#include <NuSerial.hpp>
-#include <NimBLEDevice.h>
-#else
-#include "BluetoothSerial.h"
-BluetoothSerial SerialBT;
-#endif
-#endif
+// #ifdef BLUETOOTH
+// #if !defined(CONFIG_IDF_TARGET_ESP32)
+// #include <NuSerial.hpp>
+// #include <NimBLEDevice.h>
+// #else
+// #include "BluetoothSerial.h"
+// BluetoothSerial SerialBT;
+// #endif
+// #endif
 
 // Set your Static IP address for wifi AP
 IPAddress local_IP(192, 168, 4, 1);
@@ -1389,12 +1389,12 @@ void defaultConfig()
     config.bt_power = 3;
     sprintf(config.bt_name, "ESP32APRS_Audio");
     config.bt_pin = 0;
-#if !defined(CONFIG_IDF_TARGET_ESP32)
-    // Bluetooth BLE
-    sprintf(config.bt_uuid, "00000001-ba2a-46c9-ae49-01b0961f68bb");
-    sprintf(config.bt_uuid_rx, "00000002-ba2a-46c9-ae49-01b0961f68bb");
-    sprintf(config.bt_uuid_tx, "00000003-ba2a-46c9-ae49-01b0961f68bb");
-#endif
+// #if !defined(CONFIG_IDF_TARGET_ESP32)
+//     // Bluetooth BLE
+//     sprintf(config.bt_uuid, "00000001-ba2a-46c9-ae49-01b0961f68bb");
+//     sprintf(config.bt_uuid_rx, "00000002-ba2a-46c9-ae49-01b0961f68bb");
+//     sprintf(config.bt_uuid_tx, "00000003-ba2a-46c9-ae49-01b0961f68bb");
+// #endif
 
     //--RF Module
     config.rf_en = false;
@@ -3157,29 +3157,29 @@ void postTransmission()
     digitalWrite(config.modbus_de_gpio, 0);
 }
 
-#ifdef BLUETOOTH
-void bluetooth_init()
-{
-    if (config.bt_master == true)
-    {
-#if !defined(CONFIG_IDF_TARGET_ESP32) || defined(CONFIG_IDF_TARGET_ESP32C6)
-        // Initialize BLE stack and Nordic UART service
-        NimBLEDevice::init(config.bt_name);
-        NimBLEDevice::getAdvertising()->setName(config.bt_name);
-        // BLE Auth
-        if (config.bt_pin > 0)
-        {
-            NimBLEDevice::setSecurityAuth(true, true, true); /** bonding, MITM, BLE secure connections */
-            NimBLEDevice::setSecurityPasskey(config.bt_pin);
-            NimBLEDevice::setSecurityIOCap(BLE_HS_IO_DISPLAY_ONLY); /** Display only passkey */
-            log_d("Bluetooth Security: Passkey %d", config.bt_pin);
-        }
-        NuSerial.begin_uuid(config.bt_uuid, config.bt_uuid_tx, config.bt_uuid_rx, 115200);
-#else
-#endif
-    }
-}
-#endif
+// #ifdef BLUETOOTH
+// void bluetooth_init()
+// {
+//     if (config.bt_master == true)
+//     {
+// #if !defined(CONFIG_IDF_TARGET_ESP32) || defined(CONFIG_IDF_TARGET_ESP32C6)
+//         // Initialize BLE stack and Nordic UART service
+//         NimBLEDevice::init(config.bt_name);
+//         NimBLEDevice::getAdvertising()->setName(config.bt_name);
+//         // BLE Auth
+//         if (config.bt_pin > 0)
+//         {
+//             NimBLEDevice::setSecurityAuth(true, true, true); /** bonding, MITM, BLE secure connections */
+//             NimBLEDevice::setSecurityPasskey(config.bt_pin);
+//             NimBLEDevice::setSecurityIOCap(BLE_HS_IO_DISPLAY_ONLY); /** Display only passkey */
+//             log_d("Bluetooth Security: Passkey %d", config.bt_pin);
+//         }
+//         NuSerial.begin_uuid(config.bt_uuid, config.bt_uuid_tx, config.bt_uuid_rx, 115200);
+// #else
+// #endif
+//     }
+// }
+// #endif
 
 // 3 seconds WDT
 #define WDT_TIMEOUT 10
@@ -6317,78 +6317,78 @@ void taskAPRS(void *pvParameters)
             sendAPRSMessageRetry();
         }
 
-#ifdef BLUETOOTH
-#if !defined(CONFIG_IDF_TARGET_ESP32) || defined(CONFIG_IDF_TARGET_ESP32C6)
-        if (NuSerial.isConnected())
-        {
-            if (NuSerial.available())
-            {
-                log_d("Bluetooth RX Data: %d Byte", NuSerial.available());
-                if (config.bt_mode == 1)
-                { // TNC2RAW MODE
-                    String rxValue = NuSerial.readString();
-                    uint8_t SendMode = TNC_CHANNEL;
-                    if (config.igate_loc2rf)
-                        SendMode |= RF_CHANNEL;
-                    if (config.igate_loc2inet)
-                        SendMode |= INET_CHANNEL;
-                    pkgTxPush(rxValue.c_str(), rxValue.length(), 1, SendMode);
-                }
-                else if (config.bt_mode == 2)
-                {
-                    // KISS MODE
-                    size_t num = NuSerial.available();
-                    for (int i = 0; i < num; i++)
-                    {
-                        kiss_serial((uint8_t)NuSerial.read());
-                    }
-                }
-                else if (config.bt_mode == 3)
-                { // AT COMMAND
-                    String cmd = NuSerial.readStringUntil('\n');
-                    cmd.trim();
-                    String ret = handleATCommand(String((char *)cmd.c_str()));
-                    if (ret != "")
-                        NuSerial.println(ret);
-                    log_d("AT-Command response: %s", ret.c_str());
-                }
-            }
-        }
-#else
-        if (SerialBT.available())
-        {
-            log_d("Bluetooth RX Data: %d Byte", SerialBT.available());
-            if (config.bt_mode == 1)
-            { // TNC2RAW MODE
-                String rxValue = SerialBT.readString();
-                uint8_t SendMode = TNC_CHANNEL;
-                if (config.igate_loc2rf)
-                    SendMode |= RF_CHANNEL;
-                if (config.igate_loc2inet)
-                    SendMode |= INET_CHANNEL;
-                pkgTxPush(rxValue.c_str(), rxValue.length(), 1, SendMode);
-            }
-            else if (config.bt_mode == 2)
-            {
-                // KISS MODE
-                size_t num = SerialBT.available();
-                for (int i = 0; i < num; i++)
-                {
-                    kiss_serial((uint8_t)SerialBT.read());
-                }
-            }
-            else if (config.bt_mode == 3)
-            { // AT COMMAND
-                String cmd = SerialBT.readStringUntil('\n');
-                cmd.trim();
-                String ret = handleATCommand(String((char *)cmd.c_str()));
-                if (ret != "")
-                    SerialBT.println(ret);
-                log_d("AT-Command response: %s", ret.c_str());
-            }
-        }
-#endif
-#endif
+// #ifdef BLUETOOTH
+// #if !defined(CONFIG_IDF_TARGET_ESP32) || defined(CONFIG_IDF_TARGET_ESP32C6)
+//         if (NuSerial.isConnected())
+//         {
+//             if (NuSerial.available())
+//             {
+//                 log_d("Bluetooth RX Data: %d Byte", NuSerial.available());
+//                 if (config.bt_mode == 1)
+//                 { // TNC2RAW MODE
+//                     String rxValue = NuSerial.readString();
+//                     uint8_t SendMode = TNC_CHANNEL;
+//                     if (config.igate_loc2rf)
+//                         SendMode |= RF_CHANNEL;
+//                     if (config.igate_loc2inet)
+//                         SendMode |= INET_CHANNEL;
+//                     pkgTxPush(rxValue.c_str(), rxValue.length(), 1, SendMode);
+//                 }
+//                 else if (config.bt_mode == 2)
+//                 {
+//                     // KISS MODE
+//                     size_t num = NuSerial.available();
+//                     for (int i = 0; i < num; i++)
+//                     {
+//                         kiss_serial((uint8_t)NuSerial.read());
+//                     }
+//                 }
+//                 else if (config.bt_mode == 3)
+//                 { // AT COMMAND
+//                     String cmd = NuSerial.readStringUntil('\n');
+//                     cmd.trim();
+//                     String ret = handleATCommand(String((char *)cmd.c_str()));
+//                     if (ret != "")
+//                         NuSerial.println(ret);
+//                     log_d("AT-Command response: %s", ret.c_str());
+//                 }
+//             }
+//         }
+// #else
+//         if (SerialBT.available())
+//         {
+//             log_d("Bluetooth RX Data: %d Byte", SerialBT.available());
+//             if (config.bt_mode == 1)
+//             { // TNC2RAW MODE
+//                 String rxValue = SerialBT.readString();
+//                 uint8_t SendMode = TNC_CHANNEL;
+//                 if (config.igate_loc2rf)
+//                     SendMode |= RF_CHANNEL;
+//                 if (config.igate_loc2inet)
+//                     SendMode |= INET_CHANNEL;
+//                 pkgTxPush(rxValue.c_str(), rxValue.length(), 1, SendMode);
+//             }
+//             else if (config.bt_mode == 2)
+//             {
+//                 // KISS MODE
+//                 size_t num = SerialBT.available();
+//                 for (int i = 0; i < num; i++)
+//                 {
+//                     kiss_serial((uint8_t)SerialBT.read());
+//                 }
+//             }
+//             else if (config.bt_mode == 3)
+//             { // AT COMMAND
+//                 String cmd = SerialBT.readStringUntil('\n');
+//                 cmd.trim();
+//                 String ret = handleATCommand(String((char *)cmd.c_str()));
+//                 if (ret != "")
+//                     SerialBT.println(ret);
+//                 log_d("AT-Command response: %s", ret.c_str());
+//             }
+//         }
+// #endif
+// #endif
 
         // SEND RF in time slot
         // if (now > timeSlot)
@@ -6802,39 +6802,39 @@ void taskAPRS(void *pvParameters)
                             }
                         }
                     }
-#ifdef BLUETOOTH
-                    if (config.bt_master)
-                    { // Output TNC2RAW to BT Serial
-                      // SerialBT.println(tnc2);
-                        if (config.bt_mode == 1)
-                        {
-                            char *rawP = (char *)malloc(tnc2.length());
-                            memcpy(rawP, tnc2.c_str(), tnc2.length());
-#if defined(CONFIG_IDF_TARGET_ESP32)
-                            SerialBT.write((uint8_t *)rawP, tnc2.length());
-#else
-                            if (NuSerial.isConnected())
-                            {
-                                NuSerial.write((uint8_t *)rawP, tnc2.length());
-                            }
-#endif
-                            free(rawP);
-                        }
-                        else if (config.bt_mode == 2)
-                        { // KISS
-                            uint8_t pkg[500];
-                            int sz = kiss_wrapper(pkg);
-#if defined(CONFIG_IDF_TARGET_ESP32)
-                            SerialBT.write(pkg, sz);
-#else
-                            if (NuSerial.isConnected())
-                            {
-                                NuSerial.write(pkg, sz);
-                            }
-#endif
-                        }
-                    }
-#endif
+// #ifdef BLUETOOTH
+//                     if (config.bt_master)
+//                     { // Output TNC2RAW to BT Serial
+//                       // SerialBT.println(tnc2);
+//                         if (config.bt_mode == 1)
+//                         {
+//                             char *rawP = (char *)malloc(tnc2.length());
+//                             memcpy(rawP, tnc2.c_str(), tnc2.length());
+// #if defined(CONFIG_IDF_TARGET_ESP32)
+//                             SerialBT.write((uint8_t *)rawP, tnc2.length());
+// #else
+//                             if (NuSerial.isConnected())
+//                             {
+//                                 NuSerial.write((uint8_t *)rawP, tnc2.length());
+//                             }
+// #endif
+//                             free(rawP);
+//                         }
+//                         else if (config.bt_mode == 2)
+//                         { // KISS
+//                             uint8_t pkg[500];
+//                             int sz = kiss_wrapper(pkg);
+// #if defined(CONFIG_IDF_TARGET_ESP32)
+//                             SerialBT.write(pkg, sz);
+// #else
+//                             if (NuSerial.isConnected())
+//                             {
+//                                 NuSerial.write(pkg, sz);
+//                             }
+// #endif
+//                         }
+//                     }
+// #endif
 
 #ifdef MQTT
                     if (config.en_mqtt && clientMQTT.connected() && (config.mqtt_topic_flag & MQTT_TOPIC_TNC))
@@ -8115,9 +8115,9 @@ void taskNetwork(void *pvParameters)
     // PPPOS_Start();    // Start PPP connection if enabled
     // #endif
 
-#ifdef BLUETOOTH
-    bluetooth_init(); // Initialize Bluetooth if enabled
-#endif
+// #ifdef BLUETOOTH
+//     bluetooth_init(); // Initialize Bluetooth if enabled
+// #endif
 
     for (;;)
     {
