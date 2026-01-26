@@ -3510,7 +3510,7 @@ void setup()
         "taskNetwork",      /* Name of the task */
         12000,              /* Stack size in words */
         NULL,               /* Task input parameter */
-        1,                  /* Priority of the task */
+        0,                  /* Priority of the task */
         &taskNetworkHandle, /* Task handle. */
         1);                 /* Core where the task should run */
     //}
@@ -3519,7 +3519,7 @@ void setup()
         "taskAPRSPoll",      /* Name of the task */
         2048,                /* Stack size in words */
         NULL,                /* Task input parameter */
-        0,                   /* Priority of the task */
+        1,                   /* Priority of the task */
         &taskAPRSPollHandle, /* Task handle. */
         1);                  /* Core where the task should run */
     xTaskCreatePinnedToCore(

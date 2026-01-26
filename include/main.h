@@ -12,7 +12,7 @@
 #define MAIN_H
 
 #define VERSION "1.6"
-#define VERSION_BUILD 'a'
+#define VERSION_BUILD 'm'
 
 #include <Arduino.h>
 #include <AX25.h>
