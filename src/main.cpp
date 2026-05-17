@@ -2803,11 +2803,11 @@ String SA8x8_getVERSION()
     // AT+DMOCONNECT required before other commands — without it SA818 returns +DMOERROR
     while (SerialRF.available()) SerialRF.read(); // flush stale bytes
     SerialRF.printf("AT+DMOCONNECT\r\n");
-    if (!SA8x8_waitResponse(data, rsp, 1000))
+    if (!SA8x8_waitResponse(data, rsp, 1500))
         return "Connection error to SA8x8";
 
     SerialRF.printf("AT+VERSION\r\n");
-    if (SA8x8_waitResponse(data, rsp, 1500))
+    if (SA8x8_waitResponse(data, rsp, 4000))
     {
         String version = data.substring(0, data.indexOf("\r\n"));
         if (version.indexOf("DMOERROR") >= 0)
@@ -2887,7 +2887,7 @@ static String SA8x8_RunCommand(const char *cmd)
     cmdDisplay.trim();
 
     SerialRF.print(cmd);
-    bool ok = SA8x8_waitResponse(data, rsp, 1500);
+    bool ok = SA8x8_waitResponse(data, rsp, 4000);
     String resp = ok ? data.substring(0, data.indexOf("\r\n")) : "TIMEOUT";
 
     AFSK_SetTxInhibit(false);
@@ -2897,6 +2897,14 @@ static String SA8x8_RunCommand(const char *cmd)
 
 String RF_SA8x8_WriteGroup()
 {
+    String data;
+    String rsp = "\r\n";
+
+    // AT+DMOCONNECT required before other commands — without it SA818 returns +DMOERROR
+    while (SerialRF.available()) SerialRF.read(); // flush stale bytes
+    SerialRF.printf("AT+DMOCONNECT\r\n");
+    if (!SA8x8_waitResponse(data, rsp, 1500))
+        return "Connection error to SA8x8";
     { String e = SA8x8_checkType(); if (e.length()) return e; }
     float rf_freq = config.freq_rx * (1.0f + config.freq_ppm / 1000000.0f);
     char cmd[80];
@@ -2907,6 +2915,14 @@ String RF_SA8x8_WriteGroup()
 
 String RF_SA8x8_WriteVolume()
 {
+     String data;
+    String rsp = "\r\n";
+
+    // AT+DMOCONNECT required before other commands — without it SA818 returns +DMOERROR
+    while (SerialRF.available()) SerialRF.read(); // flush stale bytes
+    SerialRF.printf("AT+DMOCONNECT\r\n");
+    if (!SA8x8_waitResponse(data, rsp, 1500))
+        return "Connection error to SA8x8";
     { String e = SA8x8_checkType(); if (e.length()) return e; }
     char cmd[40];
     sprintf(cmd, "AT+DMOSETVOLUME=%d\r\n", config.volume);
@@ -2915,6 +2931,13 @@ String RF_SA8x8_WriteVolume()
 
 String RF_SA8x8_WriteFilters()
 {
+    String data;
+    String rsp = "\r\n";
+    // AT+DMOCONNECT required before other commands — without it SA818 returns +DMOERROR
+    while (SerialRF.available()) SerialRF.read(); // flush stale bytes
+    SerialRF.printf("AT+DMOCONNECT\r\n");
+    if (!SA8x8_waitResponse(data, rsp, 1500))
+        return "Connection error to SA8x8";
     { String e = SA8x8_checkType(); if (e.length()) return e; }
     char cmd[40];
     // SA818: 0=filter enabled, 1=filter disabled (inverted vs UI bit)
@@ -3053,20 +3076,20 @@ void RF_MODULE(bool boot)
         sprintf(str, "AT+DMOSETGROUP=%01d,%0.4f,%0.4f,%d,%01d,%d,0", config.band, rf_freq, rf_freq, 0, config.sql_level, 0);
         SerialRF.println(str);
         log_d("Write to SR_FRS: %s", str);
-        if (SA8x8_waitResponse(data, rsp, 1500))
+        if (SA8x8_waitResponse(data, rsp, 4000))
             log_d("%s", data.c_str());
         // Module auto power save setting
         SerialRF.printf("AT+DMOAUTOPOWCONTR=1\r\n");
-        if (SA8x8_waitResponse(data, rsp, 1500))
+        if (SA8x8_waitResponse(data, rsp, 4000))
             log_d("%s", data.c_str());
         SerialRF.printf("AT+DMOSETVOX=0\r\n");
-        if (SA8x8_waitResponse(data, rsp, 1500))
+        if (SA8x8_waitResponse(data, rsp, 4000))
             log_d("%s", data.c_str());
         SerialRF.printf("AT+DMOSETMIC=6,0\r\n");
-        if (SA8x8_waitResponse(data, rsp, 1500))
+        if (SA8x8_waitResponse(data, rsp, 4000))
             log_d("%s", data.c_str());
         SerialRF.printf("AT+DMOSETVOLUME=%d\r\n", config.volume);
-        if (SA8x8_waitResponse(data, rsp, 1500))
+        if (SA8x8_waitResponse(data, rsp, 4000))
             log_d("%s", data.c_str());
     }
     else if ((config.rf_type == RF_SA8x8_VHF) || (config.rf_type == RF_SA8x8_UHF) || (config.rf_type == RF_SA8x8_350))

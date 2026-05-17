@@ -2240,7 +2240,7 @@ void handle_radio(AsyncWebServerRequest *request)
 		strcat(html, "}\n");
 		strcat(html, "});\n");
 		strcat(html, "});\n");
-		strcat(html, "function rfType(){\n");
+		strcat(html, "function rfType(changed){\n");
 		strcat(html, "var type = document.getElementById(\"rf_type\").value;\n");
 		strcat(html, "if(type==1||type==4||type==7){document.getElementById(\"freq\").setAttribute(\"max\",174);};\n");
 		strcat(html, "if(type==1){document.getElementById(\"freq\").setAttribute(\"min\",134);};\n");
@@ -2251,8 +2251,8 @@ void handle_radio(AsyncWebServerRequest *request)
 		strcat(html, "if(type==3){document.getElementById(\"freq\").setAttribute(\"max\",400);};\n");
 		strcat(html, "if(type==6){document.getElementById(\"freq\").setAttribute(\"min\",350);};\n");
 		strcat(html, "if(type==6){document.getElementById(\"freq\").setAttribute(\"max\",390);};\n");
-		strcat(html, "if(type==1||type==4||type==7){document.getElementById(\"freq\").setAttribute(\"value\",144.390);};\n");
-		strcat(html, "if(type==2||type==5||type==8){document.getElementById(\"freq\").setAttribute(\"value\",432.5);};\n");
+		strcat(html, "if(changed){if(type==1||type==4||type==7){document.getElementById(\"freq\").value=144.3900;};};\n");
+		strcat(html, "if(changed){if(type==2||type==5||type==8){document.getElementById(\"freq\").value=432.5000;};};\n");
 		strcat(html, "document.getElementById(\"btn_rfver\").style.display=(type==1||type==2||type==3)?\"inline\":\"none\";\n");
 		strcat(html, "var sa8x8=(type==1||type==2||type==3)?\"inline\":\"none\";\n");
 		strcat(html, "document.getElementById(\"btnWrGroup\").style.display=sa8x8;\n");
@@ -2266,7 +2266,8 @@ void handle_radio(AsyncWebServerRequest *request)
 		// Apply Change button stays enabled always so user can save the disabled state
 		strcat(html, "}\n");
 		strcat(html, "function rfWriteCmd(url,title){\n");
-		strcat(html, "fetch(url).then(function(r){return r.text();}).then(function(v){alert(title+\":\\n\\n\"+v);}).catch(function(){alert(\"Connection error\");});\n");
+		strcat(html, "var ctrl=new AbortController();var timer=setTimeout(function(){ctrl.abort();},4000);\n");
+		strcat(html, "fetch(url,{signal:ctrl.signal}).then(function(r){clearTimeout(timer);return r.text();}).then(function(v){alert(title+\":\\n\\n\"+v);}).catch(function(){alert(\"Connection error or timeout\");});\n");
 		strcat(html, "}\n");
 		strcat(html, "function checkRfVersion(){\n");
 		strcat(html, "fetch(\"/rfver\").then(function(r){return r.text();}).then(function(v){alert(v);}).catch(function(){alert(\"Connection error to SA8x8\");});\n");
@@ -2292,7 +2293,7 @@ void handle_radio(AsyncWebServerRequest *request)
 		strcat(html, "<tr>\n");
 		strcat(html, "<td align=\"right\"><b>Module Type:</b></td>\n");
 		strcat(html, "<td style=\"text-align: left;\">\n");
-		strcat(html, "<select name=\"rf_type\" id=\"rf_type\" onchange=\"rfType()\">\n");
+		strcat(html, "<select name=\"rf_type\" id=\"rf_type\" onchange=\"rfType(true)\">\n");
 		for (int i = 0; i < 10; i++)
 		{
 			snprintf(temp_buffer, sizeof(temp_buffer), "<option value=\"%d\" ", i);
