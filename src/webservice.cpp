@@ -132,6 +132,8 @@ extern String SA8x8_getVERSION();
 extern String RF_SA8x8_WriteGroup();
 extern String RF_SA8x8_WriteVolume();
 extern String RF_SA8x8_WriteFilters();
+extern String RF_SA8x8_ReadSettings();
+extern bool SA8x8_connected;
 
 #ifdef OLED
 #ifdef SH1106
@@ -1033,6 +1035,11 @@ void handle_rfwrite_volume(AsyncWebServerRequest *request)
 void handle_rfwrite_filters(AsyncWebServerRequest *request)
 {
 	request->send(200, "text/plain", RF_SA8x8_WriteFilters());
+}
+
+void handle_rfread(AsyncWebServerRequest *request)
+{
+	request->send(200, "text/plain", RF_SA8x8_ReadSettings());
 }
 
 void handle_sysinfo(AsyncWebServerRequest *request)
@@ -2258,6 +2265,7 @@ void handle_radio(AsyncWebServerRequest *request)
 		strcat(html, "document.getElementById(\"btnWrGroup\").style.display=sa8x8;\n");
 		strcat(html, "document.getElementById(\"btnWrVolume\").style.display=sa8x8;\n");
 		strcat(html, "document.getElementById(\"btnWrFilters\").style.display=sa8x8;\n");
+		strcat(html, "document.getElementById(\"btnReadSettings\").style.display=sa8x8;\n");
 		strcat(html, "}\n");
 		strcat(html, "function rfEnableToggle(){\n");
 		strcat(html, "var en=document.getElementById(\"radioEnableChk\").checked;\n");
@@ -2265,8 +2273,8 @@ void handle_radio(AsyncWebServerRequest *request)
 		strcat(html, "document.querySelectorAll(\"#formRadio input:not([name='radioEnable']):not([name='commitRadio']),#formRadio select,#formRadio button[type='button']\").forEach(function(el){el.disabled=!en;});\n");
 		// Apply Change button stays enabled always so user can save the disabled state
 		strcat(html, "}\n");
-		strcat(html, "function rfWriteCmd(url,title){\n");
-		strcat(html, "var ctrl=new AbortController();var timer=setTimeout(function(){ctrl.abort();},4000);\n");
+		strcat(html, "function rfWriteCmd(url,title,ms){\n");
+		strcat(html, "var ctrl=new AbortController();var timer=setTimeout(function(){ctrl.abort();},(ms||10000));\n");
 		strcat(html, "fetch(url,{signal:ctrl.signal}).then(function(r){clearTimeout(timer);return r.text();}).then(function(v){alert(title+\":\\n\\n\"+v);}).catch(function(){alert(\"Connection error or timeout\");});\n");
 		strcat(html, "}\n");
 		strcat(html, "function checkRfVersion(){\n");
@@ -2455,6 +2463,9 @@ void handle_radio(AsyncWebServerRequest *request)
 			strcat(html, "<button class=\"button\" type='button' id='btnWrFilters' style=\"display:");
 			strcat(html, d);
 			strcat(html, ";\" onclick=\"rfWriteCmd('/rfwritefilters','Write Filters')\">Write Filters</button>");
+			strcat(html, " <button class=\"button\" type='button' id='btnReadSettings' style=\"display:");
+			strcat(html, d);
+			strcat(html, ";\" onclick=\"rfWriteCmd('/rfread','Read Settings',15000)\">Read Settings</button>");
 		}
 		strcat(html, "<span style=\"float:right;\">");
 		strcat(html, "<button class=\"button\" type='submit' id='submitRadio' name=\"commitRadio\"> Apply Change </button>");
@@ -11577,7 +11588,7 @@ void handle_about(AsyncWebServerRequest *request)
 
 	strcat(webString, "<table>");
 	strcat(webString, "<th colspan=\"2\"><span><b>Developer/Support Information</b></span></th>\n");
-	strcat(webString, "<tr><td align=\"right\"><b>Author: </b></td><td align=\"left\">Mr.Somkiat Nakhonthai <small>(updated by Cristi Mitroi - YO3GWM)</small></td></tr>");
+	strcat(webString, "<tr><td align=\"right\"><b>Author: </b></td><td align=\"left\">Mr.Somkiat Nakhonthai (updated by Cristi Mitroi - YO3GWM)</td></tr>");
 	strcat(webString, "<tr><td align=\"right\"><b>Callsign: </b></td><td align=\"left\">HS5TQA,Atten,Nakhonthai</td></tr>\n");
 	strcat(webString, "<tr><td align=\"right\"><b>Country: </b></td><td align=\"left\">Bangkok,Thailand</td></tr>\n");
 	strcat(webString, "<tr><td align=\"right\"><b>Github: </b></td><td align=\"left\"><a href=\"https://github.com/nakhonthai\" target=\"_github\">https://github.com/nakhonthai</a></td></tr>");
@@ -12095,6 +12106,8 @@ void webService()
 					{ handle_rfwrite_volume(request); });
 	async_server.on("/rfwritefilters", HTTP_GET, [](AsyncWebServerRequest *request)
 					{ handle_rfwrite_filters(request); });
+	async_server.on("/rfread", HTTP_GET, [](AsyncWebServerRequest *request)
+					{ handle_rfread(request); });
 	// async_server.on("/lastHeard", HTTP_GET, [](AsyncWebServerRequest *request)
 	// 				{ handle_lastHeard(request); });
 	async_server.on("/style.css", HTTP_GET, [](AsyncWebServerRequest *request)

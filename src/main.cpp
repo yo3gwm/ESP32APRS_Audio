@@ -2712,45 +2712,7 @@ void printTime()
 {
     struct tm tmstruct;
     getLocalTime(&tmstruct, 5000);
-    // Serial.print("[");
-    // Serial.print(tmstruct.tm_hour);
-    // Serial.print(":");
-    // Serial.print(tmstruct.tm_min);
-    // Serial.print(":");
-    // Serial.print(tmstruct.tm_sec);
-    // Serial.print("]");
 }
-
-// uint8_t gwRaw[PKGLISTSIZE][66];
-// uint8_t gwRawSize[PKGLISTSIZE];
-// int gwRaw_count = 0, gwRaw_idx_rd = 0, gwRaw_idx_rw = 0;
-
-// void pushGwRaw(uint8_t *raw, uint8_t size)
-// {
-//     if (gwRaw_count > PKGLISTSIZE)
-//         return;
-//     if (++gwRaw_idx_rw >= PKGLISTSIZE)
-//         gwRaw_idx_rw = 0;
-//     if (size > 65)
-//         size = 65;
-//     memcpy(&gwRaw[gwRaw_idx_rw][0], raw, size);
-//     gwRawSize[gwRaw_idx_rw] = size;
-//     gwRaw_count++;
-// }
-
-// uint8_t popGwRaw(uint8_t *raw)
-// {
-//     uint8_t size = 0;
-//     if (gwRaw_count <= 0)
-//         return 0;
-//     if (++gwRaw_idx_rd >= PKGLISTSIZE)
-//         gwRaw_idx_rd = 0;
-//     size = gwRawSize[gwRaw_idx_rd];
-//     memcpy(raw, &gwRaw[gwRaw_idx_rd][0], size);
-//     if (gwRaw_count > 0)
-//         gwRaw_count--;
-//     return size;
-// }
 
 bool SA8x8_waitResponse(String &data, String rsp, uint32_t timeout)
 {
@@ -2766,10 +2728,8 @@ bool SA8x8_waitResponse(String &data, String rsp, uint32_t timeout)
             {
                 return true;
             }
-            // esp_task_wdt_reset();
         }
         delay(1);
-        // esp_task_wdt_reset();
     } while (millis() - startMillis < timeout);
     return false;
 }
@@ -2778,44 +2738,22 @@ int SA8x8_getRSSI()
 {
     String data;
     int rssi;
-
-    // Serial.printf("AT+RSSI?\r\n");
-    SerialRF.printf("AT+RSSI?\r\n");
-    if (SA8x8_waitResponse(data, "\r\n", 1000))
+    SerialRF.print("AT+RSSI?\r\n");
+    if (SA8x8_waitResponse(data, "\r\n", 2000))
     {
-        // Serial.println(INFO + data);
         String rssi = data.substring(data.indexOf("RSSI=") + strlen("RSSI="), data.indexOf("\r\n"));
         rssi = rssi.toInt();
         return rssi.toInt();
     }
     else
     {
-        // timeout or error
         return 0;
     }
 }
 
-String SA8x8_getVERSION()
-{
-    String data;
-    String rsp = "\r\n";
+static String SA8x8_RunCommand(const char *cmd); // forward declaration
 
-    // AT+DMOCONNECT required before other commands — without it SA818 returns +DMOERROR
-    while (SerialRF.available()) SerialRF.read(); // flush stale bytes
-    SerialRF.printf("AT+DMOCONNECT\r\n");
-    if (!SA8x8_waitResponse(data, rsp, 1500))
-        return "Connection error to SA8x8";
 
-    SerialRF.printf("AT+VERSION\r\n");
-    if (SA8x8_waitResponse(data, rsp, 4000))
-    {
-        String version = data.substring(0, data.indexOf("\r\n"));
-        if (version.indexOf("DMOERROR") >= 0)
-            return "Version not supported by this module";
-        return version;
-    }
-    return "Connection error to SA8x8";
-}
 
 String FRS_getVERSION()
 {
@@ -2845,10 +2783,6 @@ String FRS_getVERSION()
 
 unsigned long SA818_Timeout = 0;
 
-// ── SA8x8 individual write helpers ──────────────────────────────────────────
-// Each function: TX interlock → inhibit → flush → DMOCONNECT → command → result
-// Returns "CMD: <cmd>\nRSP: <response>" for display in web popup.
-
 static String SA8x8_checkType()
 {
     if (config.rf_type == RF_SA8x8_VHF ||
@@ -2862,8 +2796,6 @@ static String SA8x8_checkType()
 static String SA8x8_RunCommand(const char *cmd)
 {
     String data, rsp = "\r\n";
-
-    // Wait for any ongoing TX (max 5s)
     if (pttActiveSince > 0 || hw_afsk_dac_isr) {
         unsigned long ws = millis();
         while ((pttActiveSince > 0 || hw_afsk_dac_isr) && (millis() - ws) < 5000)
@@ -2874,86 +2806,69 @@ static String SA8x8_RunCommand(const char *cmd)
         }
     }
     AFSK_SetTxInhibit(true);
-
     while (SerialRF.available()) SerialRF.read();
-    SerialRF.printf("AT+DMOCONNECT\r\n");
-    if (!SA8x8_waitResponse(data, rsp, 1000)) {
+    SerialRF.print("AT+DMOCONNECT\r\n");
+    if (!SA8x8_waitResponse(data, rsp, 2000)) {
         AFSK_SetTxInhibit(false);
-        return "ERR: Module not responding to AT+DMOCONNECT";
+        return "ERR: Module not responding";
     }
-
-    // Build display: strip trailing \r\n from cmd
+    delay(50);
     String cmdDisplay = cmd;
     cmdDisplay.trim();
-
+    while (SerialRF.available()) SerialRF.read();
     SerialRF.print(cmd);
-    bool ok = SA8x8_waitResponse(data, rsp, 4000);
+    bool ok = SA8x8_waitResponse(data, rsp, 2000);
     String resp = ok ? data.substring(0, data.indexOf("\r\n")) : "TIMEOUT";
-
     AFSK_SetTxInhibit(false);
-
-    return "CMD: " + cmdDisplay + "\nRSP: " + resp;
+    return "TX : " + cmdDisplay + "\nRX : " + resp;
+}
+String SA8x8_getVERSION()
+{
+    { String e = SA8x8_checkType(); if (e.length()) return e; }
+    return SA8x8_RunCommand("AT+VERSION\r\n");
 }
 
 String RF_SA8x8_WriteGroup()
 {
-    String data;
-    String rsp = "\r\n";
-
-    // AT+DMOCONNECT required before other commands — without it SA818 returns +DMOERROR
-    while (SerialRF.available()) SerialRF.read(); // flush stale bytes
-    SerialRF.printf("AT+DMOCONNECT\r\n");
-    if (!SA8x8_waitResponse(data, rsp, 1500))
-        return "Connection error to SA8x8";
     { String e = SA8x8_checkType(); if (e.length()) return e; }
+    if (config.freq_rx < 100.0f || config.freq_rx > 520.0f)
+        return "ERR: Frequency " + String(config.freq_rx, 4) + " MHz out of range — check config";
     float rf_freq = config.freq_rx * (1.0f + config.freq_ppm / 1000000.0f);
     char cmd[80];
-    sprintf(cmd, "AT+DMOSETGROUP=%01d,%0.4f,%0.4f,%04d,%01d,%04d\r\n",
-            config.band, rf_freq, rf_freq, 0, config.sql_level, 0);
+    snprintf(cmd, sizeof(cmd), "AT+DMOSETGROUP=%01d,%0.4f,%0.4f,%04d,%01d,%04d\r\n", config.band, rf_freq, rf_freq, 0, config.sql_level, 0);
     return SA8x8_RunCommand(cmd);
 }
 
 String RF_SA8x8_WriteVolume()
 {
-     String data;
-    String rsp = "\r\n";
-
-    // AT+DMOCONNECT required before other commands — without it SA818 returns +DMOERROR
-    while (SerialRF.available()) SerialRF.read(); // flush stale bytes
-    SerialRF.printf("AT+DMOCONNECT\r\n");
-    if (!SA8x8_waitResponse(data, rsp, 1500))
-        return "Connection error to SA8x8";
     { String e = SA8x8_checkType(); if (e.length()) return e; }
     char cmd[40];
-    sprintf(cmd, "AT+DMOSETVOLUME=%d\r\n", config.volume);
+    snprintf(cmd, sizeof(cmd), "AT+DMOSETVOLUME=%d\r\n", config.volume);
     return SA8x8_RunCommand(cmd);
 }
 
 String RF_SA8x8_WriteFilters()
 {
-    String data;
-    String rsp = "\r\n";
-    // AT+DMOCONNECT required before other commands — without it SA818 returns +DMOERROR
-    while (SerialRF.available()) SerialRF.read(); // flush stale bytes
-    SerialRF.printf("AT+DMOCONNECT\r\n");
-    if (!SA8x8_waitResponse(data, rsp, 1500))
-        return "Connection error to SA8x8";
     { String e = SA8x8_checkType(); if (e.length()) return e; }
-    char cmd[40];
-    // SA818: 0=filter enabled, 1=filter disabled (inverted vs UI bit)
-    sprintf(cmd, "AT+SETFILTER=%d,%d,%d\r\n",
+    char cmd[32];
+    snprintf(cmd, sizeof(cmd), "AT+SETFILTER=%d,%d,%d\r\n",
             (config.rf_filters & 0x01) ? 0 : 1,
             (config.rf_filters & 0x02) ? 0 : 1,
             (config.rf_filters & 0x04) ? 0 : 1);
     return SA8x8_RunCommand(cmd);
 }
+
+String RF_SA8x8_ReadSettings()
+{
+    { String e = SA8x8_checkType(); if (e.length()) return e; }
+    return SA8x8_RunCommand("AT+DMOREADGROUP\r\n");
+}
 // ────────────────────────────────────────────────────────────────────────────
 
 void RF_MODULE_SLEEP()
 {
-    digitalWrite(config.rf_pwr_gpio, !config.rf_pwr_active);
-    digitalWrite(config.rf_pd_gpio, LOW);
-    // PMU.disableDC3();
+    if (config.rf_pwr_gpio != -1) digitalWrite(config.rf_pwr_gpio, !config.rf_pwr_active);
+    if (config.rf_pd_gpio  != -1) digitalWrite(config.rf_pd_gpio,  !config.rf_pd_active);
 }
 
 String hexToString(String hex)
@@ -3033,6 +2948,12 @@ void RF_MODULE(bool boot)
         // Power-cycling during Apply would pull SQL low → sqlActiveOld transition
         // → AFSK_TimerEnable(false) called after adcEn=1 restart → permanent RX loss.
 
+        // Ensure PD pin is HIGH (module active) — may have been pulled LOW by a previous sleep
+        if (config.rf_pd_gpio != -1) {
+            digitalWrite(config.rf_pd_gpio, config.rf_pd_active);
+            delay(500);
+        }
+
         // Wait for any ongoing TX to finish before AT commands (max 5s)
         if (pttActiveSince > 0 || hw_afsk_dac_isr)
         {
@@ -3054,8 +2975,6 @@ void RF_MODULE(bool boot)
         while (SerialRF.available()) SerialRF.read();
         delay(100);
     }
-
-    SerialRF.write("\r\n");
 
     char str[200];
     String rsp = "\r\n";
@@ -3094,28 +3013,32 @@ void RF_MODULE(bool boot)
     }
     else if ((config.rf_type == RF_SA8x8_VHF) || (config.rf_type == RF_SA8x8_UHF) || (config.rf_type == RF_SA8x8_350))
     {
+        while (SerialRF.available()) SerialRF.read();
         SerialRF.printf("AT+DMOCONNECT\r\n");
-        if (SA8x8_waitResponse(data, rsp, 1000))
-            log_d("%s", data.c_str());
-        RF_VERSION = SA8x8_getVERSION();
-        log_d("RF Module Version %s", RF_VERSION);
+        if (SA8x8_waitResponse(data, rsp, 2000)) {
+            log_d("DMOCONNECT OK: %s", data.c_str());
+        } else {
+            log_d("DMOCONNECT timeout");
+        }
+        delay(500);
         sprintf(str, "AT+DMOSETGROUP=%01d,%0.4f,%0.4f,%04d,%01d,%04d\r\n", config.band, rf_freq, rf_freq, 0, config.sql_level, 0);
+        while (SerialRF.available()) SerialRF.read();
         SerialRF.print(str);
         log_d("Write to SA8x8: %s", str);
         if (SA8x8_waitResponse(data, rsp, 2000))
             log_d("%s", data.c_str());
         SerialRF.printf("AT+SETTAIL=0\r\n");
-        if (SA8x8_waitResponse(data, rsp, 1000))
+        if (SA8x8_waitResponse(data, rsp, 2000))
             log_d("%s", data.c_str());
         // SA818 filter logic: 0=enabled, 1=disabled (inverted vs UI)
         SerialRF.printf("AT+SETFILTER=%d,%d,%d\r\n",
             (config.rf_filters & 0x01) ? 0 : 1,  // bit0: pre/de-emphasis
             (config.rf_filters & 0x02) ? 0 : 1,  // bit1: high pass
             (config.rf_filters & 0x04) ? 0 : 1); // bit2: low pass
-        if (SA8x8_waitResponse(data, rsp, 1000))
+        if (SA8x8_waitResponse(data, rsp, 2000))
             log_d("%s", data.c_str());
         SerialRF.printf("AT+DMOSETVOLUME=%d\r\n", config.volume);
-        if (SA8x8_waitResponse(data, rsp, 1000))
+        if (SA8x8_waitResponse(data, rsp, 2000))
             log_d("%s", data.c_str());
     }
     else if ((config.rf_type == RF_SR_2WVS) || (config.rf_type == RF_SR_2WUS))
@@ -3185,8 +3108,8 @@ void RF_MODULE_CHECK()
     else
     {
         log_d("RF Module %s sleep", RF_TYPE[config.rf_type]);
-        digitalWrite(config.rf_pwr_gpio, !config.rf_pwr_active);
-        digitalWrite(config.rf_pd_gpio, LOW);
+        if (config.rf_pwr_gpio != -1) digitalWrite(config.rf_pwr_gpio, !config.rf_pwr_active);
+        if (config.rf_pd_gpio  != -1) digitalWrite(config.rf_pd_gpio,  !config.rf_pd_active);
         delay(500);
         RF_MODULE(true);
     }
